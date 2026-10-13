@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ayuda a la Casa a Cruzar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        canvas {
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white h-screen w-screen overflow-hidden flex flex-col items-center justify-center">
+
+    <!-- Contenedor principal del juego -->
+    <div id="game-container" class="relative w-full max-w-md h-full max-h-[850px] bg-slate-950 shadow-2xl flex flex-col overflow-hidden border-4 border-slate-700 rounded-3xl">
+
+        <!-- Barra Superior / HUD -->
+        <div id="hud" class="hidden absolute top-0 left-0 w-full bg-slate-900/90 backdrop-blur-md px-4 py-3 border-b border-slate-800 flex justify-between items-center z-20">
+            <div>
+                <span class="text-xs text-slate-400 block font-bold uppercase">Puntaje</span>
+                <span id="score-display" class="title-font text-2xl text-yellow-400">0</span>
+            </div>
+            <div class="text-center">
+                <span class="text-xs text-slate-400 block font-bold uppercase">Meta</span>
+                <span class="title-font text-lg text-emerald-400">27,000 pts</span>
+            </div>
+            <div>
+                <span class="text-xs text-slate-400 block font-bold uppercase">Carril</span>
+                <span id="lane-display" class="title-font text-xl text-cyan-400">0</span>
+            </div>
+        </div>
+
+        <!-- Pantalla de Inicio -->
+        <div id="screen-start" class="absolute inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-950 flex flex-col items-center justify-center p-6 z-30 text-center">
+            <div class="animate-bounce mb-4">
+                <div class="w-20 h-20 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg border-4 border-amber-300 text-4xl">
+                    🏡
+                </div>
+            </div>
+            <h1 class="title-font text-4xl text-yellow-300 mb-2 drop-shadow-md">¡Ayuda a la Casa a Cruzar!</h1>
+            <p class="text-slate-300 text-sm mb-6 max-w-xs leading-relaxed">
+                Cruza la carretera infestada de autos veloces. Cada carril vale <strong class="text-yellow-400">25 puntos</strong>. ¡Llega a <strong class="text-emerald-400">27,000 puntos</strong> para ganar!
+            </p>
+            <div class="bg-red-950/60 border border-red-500/50 p-3 rounded-xl mb-8 text-xs text-red-200 max-w-xs">
+                ⚠️ <strong class="font-bold">¡CUIDADO!</strong> Si chocas contra un auto pierdes <span class="text-red-400 font-bold underline">TODOS los puntos</span> acumulados.
+            </div>
+            <button id="btn-start" class="w-full max-w-xs bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white title-font text-xl py-4 rounded-2xl shadow-lg transform transition active:scale-95 border-b-4 border-teal-800">
+                ¡JUGAR AHORA! 🚀
+            </button>
+        </div>
+
+        <!-- Pantalla de Game Over (Colisión) -->
+        <div id="screen-gameover" class="hidden absolute inset-0 bg-red-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 z-30 text-center">
+            <div class="text-6xl mb-3 animate-pulse">💥🏡</div>
+            <h2 class="title-font text-3xl text-red-400 mb-1">¡CHOCASTE!</h2>
+            <p id="gameover-msg" class="text-slate-200 text-sm mb-6">¡Perdiste todos tus puntos y regresas al inicio!</p>
+            <button id="btn-retry" class="w-full max-w-xs bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white title-font text-xl py-4 rounded-2xl shadow-lg transform transition active:scale-95 border-b-4 border-orange-900">
+                INTENTAR DE NUEVO 🔄
+            </button>
+        </div>
+
+        <!-- Pantalla de Victoria -->
+        <div id="screen-victory" class="hidden absolute inset-0 bg-emerald-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 z-30 text-center">
+            <div class="text-6xl mb-3 animate-bounce">🏆🎉</div>
+            <h2 class="title-font text-4xl text-yellow-300 mb-2">¡VICTORIA ÉPICA!</h2>
+            <p class="text-slate-200 text-sm mb-4">¡Lograste los 27,000 puntos y la casita cruzó a salvo!</p>
+            <div class="bg-emerald-900/80 border border-emerald-500 p-4 rounded-2xl mb-6 w-full max-w-xs">
+                <span class="text-xs text-emerald-300 block font-bold uppercase">Puntuación Final</span>
+                <span id="final-score" class="title-font text-3xl text-yellow-400">27,000</span>
+            </div>
+            <button id="btn-restart" class="w-full max-w-xs bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white title-font text-xl py-4 rounded-2xl shadow-lg transform transition active:scale-95 border-b-4 border-teal-800">
+                JUGAR DE NUEVO 🎮
+            </button>
+        </div>
+
+        <!-- Canvas del Juego -->
+        <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+        <!-- Controles Táctiles flotantes para dispositivos móviles -->
+        <div id="touch-controls" class="hidden absolute bottom-4 left-0 w-full px-6 flex justify-between items-center z-20 pointer-events-none">
+            <div class="flex gap-2 pointer-events-auto">
+                <button id="btn-left" class="w-14 h-14 bg-slate-800/80 hover:bg-slate-700 active:bg-slate-600 border border-slate-600 rounded-2xl text-2xl flex items-center justify-center shadow-lg text-white">◀</button>
+                <button id="btn-right" class="w-14 h-14 bg-slate-800/80 hover:bg-slate-700 active:bg-slate-600 border border-slate-600 rounded-2xl text-2xl flex items-center justify-center shadow-lg text-white">▶</button>
+            </div>
+            <div class="flex gap-2 pointer-events-auto">
+                <button id="btn-down" class="w-14 h-14 bg-slate-800/80 hover:bg-slate-700 active:bg-slate-600 border border-slate-600 rounded-2xl text-2xl flex items-center justify-center shadow-lg text-white">▼</button>
+                <button id="btn-up" class="w-14 h-14 bg-slate-800/80 hover:bg-slate-700 active:bg-slate-600 border border-slate-600 rounded-2xl text-2xl flex items-center justify-center shadow-lg text-white">▲</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Elementos de UI
+        const screenStart = document.getElementById('screen-start');
+        const screenGameOver = document.getElementById('screen-gameover');
+        const screenVictory = document.getElementById('screen-victory');
+        const hud = document.getElementById('hud');
+        const scoreDisplay = document.getElementById('score-display');
+        const laneDisplay = document.getElementById('lane-display');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const gameoverMsg = document.getElementById('gameover-msg');
+        const touchControls = document.getElementById('touch-controls');
+
+        // Configuración de dimensiones escalables
+        let width = 400;
+        let height = 750;
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            width = container.clientWidth;
+            height = container.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Estados del juego
+        let gameState = 'START'; // START, PLAYING, GAMEOVER, VICTORY
+        let score = 0;
+        let maxLaneReached = 0;
+        const TARGET_SCORE = 27000;
+        const POINTS_PER_LANE = 25;
+
+        // Estructura de la Carretera
+        const laneHeight = 45;
+        const totalLanes = Math.ceil(TARGET_SCORE / POINTS_PER_LANE); // 1080 carriles para 27,000 puntos
+        const roadWorldHeight = totalLanes * laneHeight;
+
+        // Posición de la Casita en el mundo (Y virtual) y pantalla
+        let house = {
+            x: width / 2,
+            y: roadWorldHeight - 50,
+            width: 32,
+            height: 32,
+            speed: 5,
+            vx: 0,
+            vy: 0
+        };
+
+        // Cámara vertical que sigue a la casita
+        let cameraY = 0;
+
+        // Definición de Carriles y Tráfico
+        let lanes = [];
+        let cars = [];
+        let particles = [];
+        let floatingTexts = [];
+
+        function initLanes() {
+            lanes = [];
+            for (let i = 0; i < totalLanes; i++) {
+                // Zona de salida o llegada segura cada ciertos tramos o al inicio/final
+                let isSafe = (i === 0 || i === totalLanes - 1 || i % 25 === 0);
+                let direction = (i % 2 === 0) ? 1 : -1; // Izquierda a derecha o viceversa
+                let speed = 1.5 + (i / totalLanes) * 3.5 + Math.random() * 1.5;
+                
+                lanes.push({
+                    index: i,
+                    y: roadWorldHeight - (i + 1) * laneHeight,
+                    isSafe: isSafe,
+                    direction: direction,
+                    speed: speed,
+                    carType: Math.floor(Math.random() * 3) // 0: Auto compacto, 1: Deportvo, 2: Camión
+                });
+            }
+        }
+
+        function initCars() {
+            cars = [];
+            lanes.forEach(lane => {
+                if (!lane.isSafe) {
+                    // Colocar 2 a 3 autos por carril de forma distribuida
+                    let numCars = 1 + Math.floor(Math.random() * 2);
+                    let spacing = width / numCars;
+                    for (let c = 0; c < numCars; c++) {
+                        let carWidth = lane.carType === 2 ? 65 : (lane.carType === 1 ? 40 : 45);
+                        let carHeight = 26;
+                        let carX = c * spacing + Math.random() * 80;
+                        cars.push({
+                            x: carX,
+                            y: lane.y + (laneHeight - carHeight) / 2,
+                            width: carWidth,
+                            height: carHeight,
+                            speed: lane.speed * lane.direction,
+                            type: lane.carType,
+                            color: getRandomCarColor()
+                        });
+                    }
+                }
+            });
+        }
+
+        function getRandomCarColor() {
+            const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // Controles de Teclado
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.key] = true;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('keyup', e => {
+            keys[e.key] = false;
+        });
+
+        // Controles táctiles móviles
+        const bindTouchButton = (id, keyName) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true; });
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyName] = false; });
+            btn.addEventListener('mousedown', () => { keys[keyName] = true; });
+            btn.addEventListener('mouseup', () => { keys[keyName] = false; });
+        };
+        bindTouchButton('btn-left', 'ArrowLeft');
+        bindTouchButton('btn-right', 'ArrowRight');
+        bindTouchButton('btn-up', 'ArrowUp');
+        bindTouchButton('btn-down', 'ArrowDown');
+
+        // Partículas y Efectos visuales de choque o puntos
+        function addParticles(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    size: Math.random() * 5 + 2,
+                    color: color,
+                    alpha: 1,
+                    decay: Math.random() * 0.03 + 0.02
+                });
+            }
+        }
+
+        function addFloatingText(x, y, text, color) {
+            floatingTexts.push({
+                x: x,
+                y: y,
+                text: text,
+                color: color,
+                alpha: 1,
+                vy: -1.5
+            });
+        }
+
+        // Sistema de Reinicio de Partida o Penalización por Choque
+        function resetHousePosition() {
+            house.x = width / 2;
+            house.y = roadWorldHeight - 50;
+            score = 0;
+            maxLaneReached = 0;
+            updateHUD();
+        }
+
+        function triggerCrash() {
+            addParticles(house.x, house.y, '#ef4444', 30);
+            addFloatingText(house.x, house.y, '- ¡PERDISTE TODOS LOS PUNTOS! -', '#ef4444');
+            
+            // penalización total: vuelve los puntos a 0
+            score = 0;
+            maxLaneReached = 0;
+            updateHUD();
+
+            // Breve parpadeo o pantalla de choque sin interrumpir bruscamente con alert()
+            showCrashModal();
+        }
+
+        function showCrashModal() {
+            screenGameOver.classList.remove('hidden');
+            gameState = 'GAMEOVER';
+        }
+
+        function updateHUD() {
+            scoreDisplay.innerText = score.toLocaleString();
+            laneDisplay.innerText = maxLaneReached;
+        }
+
+        // Lógica de Actualización del Juego
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            // Movimiento de la casita
+            let moveX = 0;
+            let moveY = 0;
+            if (keys['ArrowLeft'] || keys['a'] || keys['A']) moveX = -house.speed;
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) moveX = house.speed;
+            if (keys['ArrowUp'] || keys['w'] || keys['W']) moveY = -house.speed;
+            if (keys['ArrowDown'] || keys['s'] || keys['S']) moveY = house.speed;
+
+            house.x += moveX;
+            house.y += moveY;
+
+            // Límites laterales de la pantalla
+            if (house.x < 15) house.x = 15;
+            if (house.x > width - 15) house.x = width - 15;
+            if (house.y < 20) house.y = 20;
+            if (house.y > roadWorldHeight - 20) house.y = roadWorldHeight - 20;
+
+            // Calcular carril actual basado en posición Y
+            let currentLaneIndex = Math.floor((roadWorldHeight - house.y) / laneHeight);
+            if (currentLaneIndex > maxLaneReached) {
+                let diff = currentLaneIndex - maxLaneReached;
+                maxLaneReached = currentLaneIndex;
+                score = maxLaneReached * POINTS_PER_LANE;
+                updateHUD();
+
+                if (score >= TARGET_SCORE) {
+                    triggerVictory();
+                }
+            }
+
+            // Actualizar posición de la cámara suavemente
+            let targetCameraY = house.y - height / 2;
+            cameraY += (targetCameraY - cameraY) * 0.1;
+            // Limitar cámara a los bordes del mundo
+            if (cameraY < 0) cameraY = 0;
+            if (cameraY > roadWorldHeight - height) cameraY = roadWorldHeight - height;
+
+            // Actualizar autos y movimiento en bucle infinito de carriles
+            cars.forEach(car => {
+                car.x += car.speed;
+                // Bucle horizontal continuo para que los autos reaparezcan al otro lado
+                if (car.speed > 0 && car.x > width + 50) {
+                    car.x = -80;
+                } else if (car.speed < 0 && car.x < -85) {
+                    car.x = width + 50;
+                }
+
+                // HITBOX EXTREMADAMENTE PRECISA Y BALANCEADA
+                // Reducimos ligeramente la caja de colisión de la casita y del auto para evitar colisiones frustrantes en esquinas
+                let houseHitbox = {
+                    x: house.x - 12,
+                    y: house.y - 12,
+                    width: 24,
+                    height: 24
+                };
+
+                let carHitbox = {
+                    x: car.x + 4,
+                    y: car.y + 4,
+                    width: car.width - 8,
+                    height: car.height - 8
+                };
+
+                if (
+                    houseHitbox.x < carHitbox.x + carHitbox.width &&
+                    houseHitbox.x + houseHitbox.width > carHitbox.x &&
+                    houseHitbox.y < carHitbox.y + carHitbox.height &&
+                    houseHitbox.y + houseHitbox.height > carHitbox.y
+                ) {
+                    // ¡COLISIÓN DETECTADA!
+                    triggerCrash();
+                }
+            });
+
+            // Actualizar partículas
+            particles.forEach((p, index) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.decay;
+                if (p.alpha <= 0) particles.splice(index, 1);
+            });
+
+            // Actualizar textos flotantes
+            floatingTexts.forEach((ft, index) => {
+                ft.y += ft.vy;
+                ft.alpha -= 0.02;
+                if (ft.alpha <= 0) floatingTexts.splice(index, 1);
+            });
+        }
+
+        function triggerVictory() {
+            gameState = 'VICTORY';
+            finalScoreDisplay.innerText = score.toLocaleString();
+            screenVictory.classList.remove('hidden');
+        }
+
+        // Renderizado Gráfico Arcade y Moderno
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.save();
+            ctx.translate(0, -cameraY);
+
+            // 1. Dibujar Carriles de la Carretera
+            lanes.forEach(lane => {
+                let y = lane.y;
+                // Color alternado de asfalto y líneas de carril
+                ctx.fillStyle = lane.isSafe ? '#1e293b' : '#0f172a';
+                ctx.fillRect(0, y, width, laneHeight);
+
+                // Líneas divisorias punteadas
+                ctx.strokeStyle = lane.isSafe ? '#334155' : '#334155';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 8]);
+                ctx.beginPath();
+                ctx.moveTo(0, y + laneHeight);
+                ctx.lineTo(width, y + laneHeight);
+                ctx.stroke();
+                ctx.setLineDash([]); // Resetear
+
+                // Decoración de zonas seguras (pastito o adoquín)
+                if (lane.isSafe) {
+                    ctx.fillStyle = '#065f46';
+                    ctx.fillRect(0, y + 2, width, 4);
+                    ctx.fillRect(0, y + laneHeight - 6, width, 4);
+                }
+            });
+
+            // 2. Dibujar Autos y Camiones
+            cars.forEach(car => {
+                ctx.save();
+                ctx.translate(car.x, car.y);
+
+                // Sombra del auto
+                ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                ctx.fillRect(4, 4, car.width, car.height);
+
+                // Cuerpo del vehículo
+                ctx.fillStyle = car.color;
+                ctx.beginPath();
+                ctx.roundRect(0, 0, car.width, car.height, 6);
+                ctx.fill();
+
+                // Parabrisas / Ventanas
+                ctx.fillStyle = '#93c5fd';
+                if (car.type === 2) { // Camión
+                    ctx.fillRect(car.width - 18, 4, 12, car.height - 8);
+                    // Remolque
+                    ctx.fillStyle = '#64748b';
+                    ctx.fillRect(4, 2, car.width - 24, car.height - 4);
+                } else if (car.type === 1) { // Deportvo
+                    ctx.fillRect(car.width / 2 - 6, 3, 16, car.height - 6);
+                } else { // Auto estándar
+                    ctx.fillRect(car.width / 2 - 8, 4, 16, car.height - 8);
+                }
+
+                // Luces delanteras y traseras
+                ctx.fillStyle = '#fef08a';
+                ctx.fillRect(car.speed > 0 ? car.width - 4 : 0, 4, 4, 6);
+                ctx.fillRect(car.speed > 0 ? car.width - 4 : 0, car.height - 10, 4, 6);
+
+                ctx.restore();
+            });
+
+            // 3. Dibujar la Casita con Patitas (Adorable)
+            ctx.save();
+            ctx.translate(house.x, house.y);
+
+            // Sombra de la casa
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.beginPath();
+            ctx.ellipse(0, 16, 14, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Patitas animadas o dinámicas
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(-8, 12, 4, 6);
+            ctx.fillRect(4, 12, 4, 6);
+
+            // Base / Paredes de la casa
+            ctx.fillStyle = '#f97316';
+            ctx.fillRect(-14, -4, 28, 20);
+
+            // Techo de la casa
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.moveTo(0, -20);
+            ctx.lineTo(-18, -4);
+            ctx.lineTo(18, -4);
+            ctx.closePath();
+            ctx.fill();
+
+            // Ventanita simpática en la casa
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(-5, 2, 10, 8);
+            ctx.strokeStyle = '#7c2d12';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(-5, 2, 10, 8);
+
+            // Puerta
+            ctx.fillStyle = '#7c2d12';
+            ctx.fillRect(-2, 8, 4, 8);
+
+            ctx.restore();
+
+            // 4. Dibujar Partículas
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 5. Dibujar Textos Flotantes
+            floatingTexts.forEach(ft => {
+                ctx.save();
+                ctx.globalAlpha = ft.alpha;
+                ctx.font = 'bold 16px Nunito, sans-serif';
+                ctx.fillStyle = ft.color;
+                ctx.textAlign = 'center';
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            });
+
+            ctx.restore();
+        }
+
+        // Bucle Principal del Juego
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event Listeners para Botones de Menús
+        document.getElementById('btn-start').addEventListener('click', () => {
+            screenStart.classList.add('hidden');
+            hud.classList.remove('hidden');
+            touchControls.classList.remove('hidden');
+            initLanes();
+            initCars();
+            resetHousePosition();
+            gameState = 'PLAYING';
+        });
+
+        document.getElementById('btn-retry').addEventListener('click', () => {
+            screenGameOver.classList.add('hidden');
+            initCars();
+            resetHousePosition();
+            gameState = 'PLAYING';
+        });
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            screenVictory.classList.add('hidden');
+            screenStart.classList.remove('hidden');
+            hud.classList.add('hidden');
+            touchControls.classList.add('hidden');
+            gameState = 'START';
+        });
+
+        // Iniciar loop visual
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
